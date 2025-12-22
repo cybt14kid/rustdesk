@@ -7,6 +7,7 @@ import argparse
 import logging
 import shutil
 import zipfile
+import sys  # 新增，用于判断平台
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,11 +72,9 @@ def download_files(task_id, output_dir, fn=None):
         stream=True,
     )
 
-    # Check if the request was successful
     if fn is None:
         fn = f"task_{task_id}_files.zip"
     if response.status_code == 200:
-        # Save the file to the output directory
         with open(os.path.join(output_dir, fn), "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:
@@ -91,9 +90,7 @@ def download_one_file(task_id, file_id, output_dir):
         stream=True,
     )
 
-    # Check if the request was successful
     if response.status_code == 200:
-        # Save the file to the output directory
         with open(os.path.join(output_dir, file_id), "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:
@@ -130,26 +127,28 @@ def delete_task(task_id):
 
 
 def sign(file_path):
-    res = create("sign", file_path)
-    if res.ok:
-        task_id = res.task_id
+    if sys.platform.startswith("win"):
+        logging.info(f"Skipping Windows signing for {file_path}")
+        return True
 
-        # Poll the status every second
+    res = create("sign", file_path)
+    if res.get("ok"):
+        task_id = res.get("task_id")
+
         while True:
             status = get_status(task_id)
-            if status["status"] == "done":
-                # Download the files
+            if status.get("status") == "done":
                 download_files(task_id, "output")
-
-                # Delete the task
                 delete_task(task_id)
-
                 break
-
             time.sleep(1)
 
 
 def sign_one_file(file_path):
+    if sys.platform.startswith("win"):
+        logging.info(f"Skipping Windows signing for {file_path}")
+        return True
+
     logging.info(f"Signing {file_path}")
     res = create("sign", file_path)
     logging.info(f"Uploaded {file_path}")
@@ -199,6 +198,10 @@ SIGN_EXTENSIONS = [
 
 
 def sign_files(dir_path, only_ext=None):
+    if sys.platform.startswith("win"):
+        logging.info("Skipping Windows signing")
+        return
+
     if only_ext:
         only_ext = only_ext.split(",")
         for i in range(len(only_ext)):
@@ -222,13 +225,11 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    # Create a parser for the "sign_one_file" command
     sign_one_file_parser = subparsers.add_parser(
         "sign_one_file", help="Sign a single file."
     )
     sign_one_file_parser.add_argument("file_path", help="The path of the file to sign.")
 
-    # Create a parser for the "sign_files" command
     sign_files_parser = subparsers.add_parser(
         "sign_files", help="Sign all files in a directory."
     )
@@ -239,21 +240,17 @@ def main():
         "only_ext", help="The file extension to sign.", default=None, nargs="?"
     )
 
-    # Create a parser for the "fetch" command
     fetch_parser = subparsers.add_parser("fetch", help="Fetch a task.")
 
-    # Create a parser for the "update_status" command
     update_status_parser = subparsers.add_parser(
         "update_status", help="Update the status of a task."
     )
     update_status_parser.add_argument("task_id", help="The ID of the task to update.")
     update_status_parser.add_argument("status", help="The new status of the task.")
 
-    # Create a parser for the "delete_task" command
     delete_task_parser = subparsers.add_parser("delete_task", help="Delete a task.")
     delete_task_parser.add_argument("task_id", help="The ID of the task to delete.")
 
-    # Create a parser for the "create" command
     create_parser = subparsers.add_parser("create", help="Create a task.")
     create_parser.add_argument("task_name", help="The name of the task to create.")
     create_parser.add_argument(
@@ -263,7 +260,6 @@ def main():
         nargs="?",
     )
 
-    # Create a parser for the "upload_file" command
     upload_file_parser = subparsers.add_parser(
         "upload_file", help="Upload a file to a task."
     )
@@ -272,7 +268,6 @@ def main():
     )
     upload_file_parser.add_argument("file_path", help="The path of the file to upload.")
 
-    # Create a parser for the "get_status" command
     get_status_parser = subparsers.add_parser(
         "get_status", help="Get the status of a task."
     )
@@ -280,7 +275,6 @@ def main():
         "task_id", help="The ID of the task to get the status of."
     )
 
-    # Create a parser for the "download_files" command
     download_files_parser = subparsers.add_parser(
         "download_files", help="Download files from a task."
     )
