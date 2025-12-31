@@ -11,37 +11,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows:
-    name: Windows Build (x64)
-    runs-on: windows-2022
+windows:
+  name: Windows Build (x64)
+  runs-on: windows-2022
 
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+  steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          use-cache: false
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
 
-      - name: Install build dependencies
-        run: |
-          choco install ninja --yes
-          choco install cmake --yes
+    - name: Install build tools
+      run: |
+        choco install llvm ninja cmake pkgconfiglite --yes
 
-      - name: Build Windows x64 RustDesk
-        shell: powershell
-        run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          ./scripts/windows_build.ps1
+    - name: Build RustDesk Windows
+      shell: powershell
+      run: |
+        cd flutter
+        flutter pub get
+        flutter build windows --release
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustdesk-windows-x64
-          path: build/windows/RustDesk.exe
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustdesk-windows-x64
+        path: flutter/build/windows/x64/runner/Release/*.exe
+
 
   android:
     name: Android Build
