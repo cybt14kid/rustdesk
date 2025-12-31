@@ -1,48 +1,47 @@
 name: Full Flutter CI
 
 on:
-  # 允许在 GitHub Actions 页面手动点击 Run workflow
-  workflow_dispatch:
-
-  # 仍然支持通过 tag 自动触发
+  # 推送 tag 自动触发
   push:
     tags:
       - 'v*'
       - 'v*-custom'
 
-jobs:
+  # 允许在 Actions 页面手动点击 Run
+  workflow_dispatch:
 
+jobs:
   windows:
-    name: Windows Build
+    name: Windows Build (x64)
     runs-on: windows-2022
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Setup vcpkg (no cache)
+      - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           use-cache: false
 
-      - name: Install build tools
+      - name: Install build dependencies
         run: |
-          choco install visualstudio2019buildtools --yes
-          choco install cmake --yes
           choco install ninja --yes
+          choco install cmake --yes
 
       - name: Build Windows x64 RustDesk
+        shell: powershell
         run: |
-          powershell -ExecutionPolicy Bypass -File .\scripts\windows_build.ps1
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          ./scripts/windows_build.ps1
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rustdesk-windows-x64
-          path: |
-            build/windows/RustDesk.exe
+          path: build/windows/RustDesk.exe
 
   android:
     name: Android Build
@@ -50,7 +49,7 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -65,7 +64,7 @@ jobs:
           flutter build apk --release
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rustdesk-android
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -76,24 +75,28 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential ninja-build pkg-config
+          sudo apt-get install -y \
+            cmake \
+            build-essential \
+            ninja-build \
+            pkg-config
 
-      - name: Build Linux RustDesk
+      - name: Build Linux
         run: |
           mkdir -p build/linux
           cd build/linux
-          cmake ../../
+          cmake ../..
           ninja
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rustdesk-linux
           path: build/linux/rustdesk
